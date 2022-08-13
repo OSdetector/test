@@ -9,11 +9,11 @@
     "network_output_file": "csv/net.csv",
     "snoop_syscall": "bcc",
     "syscall_output_file": "csv/syscall.csv",
-    "interval": 3,
+    "interval": 2,
     "trace_multiprocess": true,
     "show_all_threads": false, 
     
     "csvpath": "csv",
     "outcomepath": "outcome",
-    "detect_interval": 10
+    "detect_interval": 60
 }

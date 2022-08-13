@@ -5,8 +5,10 @@ import argparse
 import multiprocessing as mp
 
 sys.path.append(os.getcwd() + '/snoop')
+sys.path.append(os.getcwd() + '/compressed-sensing')
 
 import top_snoop
+import detect
 
 if __name__=='__main__':
 
@@ -17,16 +19,15 @@ if __name__=='__main__':
     snoop_process = mp.Process(target=top_snoop.start, args=(configure, ))
     snoop_process.start()
 
-    # 四个csv上一次检测到的最后一行
-    last = [0, 0, 0, 0]
+    # 上一次检测到的最后一行
+    last = [0, 0, 0]
     while True:
-        """
-        csv in ./csv/
-        outcome in ./outcome/
-        """
+        time.sleep(configure['detect_interval'])
+        detect.detect("csv/cpu.csv", "outcome/cpu.csv", last[0])
+        detect.detect("csv/mem.csv", "outcome/mem.csv", last[1])
+        detect.detect("csv/net.csv", "outcome/net.csv", last[2])
+
         last[0] = len(open("csv/cpu.csv", 'r').readlines())
         last[1] = len(open("csv/mem.csv", 'r').readlines())
         last[2] = len(open("csv/net.csv", 'r').readlines())
-        last[3] = len(open("csv/syscall.csv", 'r').readlines())
-        print(last)
-        time.sleep(configure['detect_interval'])
+

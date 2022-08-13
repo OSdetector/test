@@ -4,8 +4,8 @@ import yaml
 from tqdm import tqdm
 
 
-from utils import data_process
-from utils.metrics import sliding_anomaly_predict
+from utils_detect import data_process
+from utils_detect.metrics import sliding_anomaly_predict
 from algorithm.cluster import cluster
 from algorithm.lesinn import online_lesinn
 from algorithm.sampling.localized_sample import localized_sample
@@ -161,15 +161,14 @@ class WindowReconstructProcess():
         return rec, retry_count
 
 
-if __name__ == '__main__':
+def detect(data_in, data_out, start):
     config = 'detector-config.yml'
     with open(config, 'r', encoding='utf8') as file:
         config_dict = yaml.load(file, Loader=yaml.Loader)
-    data = pd.read_csv(config_dict['data']['path'], header=1)
-
+    data = pd.read_csv(data_in, header=1)
     # DEBUG
     # Chop down data size
-    data = data.iloc[:, 1:2]
+    data = data.iloc[start:data.shape[0], 2:data.shape[1]]
 
     n, d = data.shape
 
@@ -286,6 +285,6 @@ if __name__ == '__main__':
     # 接下来使用EVT等方式确定阈值，并做出检测
     predict = sliding_anomaly_predict(anomaly_score, 100)
 
-    np.savetxt("predict.csv", predict, delimiter=",")
+    np.savetxt(data_out, predict, delimiter=",")
 
     print("Done")

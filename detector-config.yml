@@ -12,8 +12,8 @@ anomaly_scoring:
 global:
   random_state: 42
 data:
-  path: "../csv/service1.csv"
-  label_path: "../csv/service1.csv"
+  path: "../csv/mem.csv"
+  #  label_path: "../csv/mem.csv"
   save_path: "./result"
   row_begin: 0
   row_end: 30000

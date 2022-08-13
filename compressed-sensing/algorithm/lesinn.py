@@ -1,13 +1,13 @@
 import numpy as np
-import cupy as cp
+#import cupy as cp
 import random
 from time import perf_counter
 
 lesinn_cuda_kernel_raw = ""
-with open("algorithm/cuda/lesinn.cu") as f:
+with open("compressed-sensing/algorithm/cuda/lesinn.cu") as f:
     lesinn_cuda_kernel_raw = f.read()
 
-lesinn_cuda_kernel = cp.RawKernel(lesinn_cuda_kernel_raw, 'lesinn')
+#lesinn_cuda_kernel = cp.RawKernel(lesinn_cuda_kernel_raw, 'lesinn')
 
 
 def similarity(x: np.ndarray, y: np.ndarray):

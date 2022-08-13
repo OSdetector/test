@@ -63,7 +63,7 @@ def network_attach_probe(bpf_obj):
     pass
 
 def network_print_header(output_file):
-    output_file.write("%s,%s,%s,%s,%s\n" % ("TIME", "PID", "COMM", "RX_KB", "TX_KB"))
+    output_file.write("%s,%s,%s,%s\n" % ("TIME", "PID", "RX_KB", "TX_KB"))
 
 def network_generate_prg(prg, show_all_threads=False):
     if show_all_threads == True:
@@ -90,15 +90,15 @@ def network_record(output_file, cur_time, bpf_obj):
     for k, (send_bytes, recv_bytes) in sorted(throughput.items(),
                                             key=lambda kv: sum(kv[1]),
                                             reverse=True):
-        output_file.write("%.2f,%d,%.12s,%.2f,%.2f\n" % (cur_time,
+        output_file.write("%.2f,%d,%.2f,%.2f\n" % (cur_time,
                                                         k.pid,
-                                                        k.name,
+                                                       # k.name,
                                                         (recv_bytes / 1024), (send_bytes / 1024)))
         valid = 1
     if valid == 0:
         for key in bpf_obj['snoop_proc'].keys():
-            output_file.write("%.2f,%d,%.12s,%.2f,%.2f\n" % (cur_time,
+            output_file.write("%.2f,%d,%.2f,%.2f\n" % (cur_time,
                                                             key.value,
-                                                            pid_to_comm(key.value),
+                                                           # pid_to_comm(key.value),
                                                             0.0, 0.0))
     output_file.flush()
