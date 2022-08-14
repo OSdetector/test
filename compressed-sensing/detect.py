@@ -283,7 +283,7 @@ def detect(data_in, data_out, start):
         wb += stride
 
     # 接下来使用EVT等方式确定阈值，并做出检测
-    predict = sliding_anomaly_predict(anomaly_score, 100)
+    predict = sliding_anomaly_predict(anomaly_score)
 
     np.savetxt(data_out, predict, delimiter=",")
 
