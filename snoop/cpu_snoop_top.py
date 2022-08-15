@@ -2,7 +2,7 @@ import os
 from utils import bfs_get_procs
 
 def cpu_top_print_header(output_file):
-    output_file.write("%s,%s,%s,%s,%s\n" %("TIME", "PID", "ON CPU(invalid)", "OFF CPU(invalid)", "CPU%"))
+    output_file.write("%s,%s,%s,%s,%s,%s\n" %("TIME", "PID", "COMM", "ON CPU(invalid)", "OFF CPU(invalid)", "CPU%"))
 
 def cpu_top_record(output_file, cur_time, snoop_pid, show_all_threads=False):
     pid_list = bfs_get_procs(snoop_pid)
@@ -21,9 +21,10 @@ def cpu_top_record(output_file, cur_time, snoop_pid, show_all_threads=False):
                     # print(row)
                 cur_pid, utilization, comm = int(row[0]), float(row[-4]), row[-1]
                 if not output_file is None:
-                    output_file.write("%.2f,%d,%d,%d,%.2f\n" % (
+                    output_file.write("%.2f,%12d,%20s,%d,%d,%.2f\n" % (
                                     cur_time,
                                     cur_pid, 
+                                    comm,
                                     -1, 
                                     -1,
                                     utilization,
@@ -31,9 +32,10 @@ def cpu_top_record(output_file, cur_time, snoop_pid, show_all_threads=False):
                     )
                     output_file.flush()
                 else:
-                    print("%.2f,%d,%d,%d,%.2f\n" % (
+                    print("%.2f,%12d,%20s,%d,%d,%.2f\n" % (
                                     cur_time,
                                     pid, 
+                                    comm,
                                     -1, 
                                     -1,
                                     utilization,

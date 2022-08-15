@@ -8,15 +8,17 @@ import json
 import os
 import ctypes
 
+# from cpu_snoop import cpu_generate_prg, cpu_attach_probe, cpu_record, cpu_bcc_print_header
+# from cpu_snoop_stat import cpu_stat_record, cpu_stat_print_header
+# from cpu_snoop_top import cpu_top_record, cpu_top_print_header
+# from mem_snoop_usr import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+# from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
+# from mem_snoop_kernel import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+# from network_snoop import network_generate_prg, network_attach_probe, network_record, network_print_header
+# from syscall_snoop import syscall_generate_prg, syscall_attach_probe, syscall_record, syscall_print_header
+# from tracer import tracer_generate_prg, trace_attach_probe, trace_record, trace_print_header
 
-from cpu_snoop import cpu_prg, cpu_attach_probe, cpu_record, cpu_bcc_print_header
-from cpu_snoop_stat import cpu_stat_record, cpu_stat_print_header
-from cpu_snoop_top import cpu_top_record, cpu_top_print_header
-from mem_snoop import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
-from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
-from network_snoop import network_generate_prg, network_attach_probe, network_record, network_print_header
-from syscall_snoop import syscall_generate_prg, syscall_attach_probe, syscall_record, syscall_print_header
-from tracer import tracer_generate_prg, trace_attach_probe, trace_record, trace_print_header
+
 
 examples="""
 EXAMPLES:
@@ -47,6 +49,7 @@ static inline int lookup_tgid(u32 tgid)
 {
      if(snoop_proc.lookup(&tgid) != NULL)
      {
+        // bpf_trace_printk("Get tgid:%u\\n", tgid);
         return 1;
      }
      if(MULTI_PROCESS==true)
@@ -58,7 +61,7 @@ static inline int lookup_tgid(u32 tgid)
         if(snoop_proc.lookup(&ppid) != NULL)
         {
                 snoop_proc.insert(&tgid, &TRUE);
-                bpf_trace_printk("Add new snoop proc, task_tgid=%d, tgid=%d, ppid=%d\\n", task_tgid, tgid, ppid);
+                //bpf_trace_printk("Add new snoop proc, task_tgid=%d, tgid=%d, ppid=%d\\n", task_tgid, tgid, ppid);
                 return 1;
         }
      }
@@ -82,7 +85,7 @@ int clear_proc(struct pt_regs *ctx)
     clear_throughput(ctx);
 #endif
     snoop_proc.delete(&tgid);
-    bpf_trace_printk("Remove %d\\n", tgid);
+   // bpf_trace_printk("Remove %d\\n", tgid);
 
     return 0;
 }
@@ -117,7 +120,7 @@ def main_loop(configure, output_fp, bpf_obj):
                 usage = cpu_stat_record(output_fp['cpu'], cur_time, cur_time-prev_time, configure["snoop_pid"], usage)
             elif configure["snoop_cpu"] == "top":
                 cpu_top_record(output_file=output_fp["cpu"], cur_time=cur_time, snoop_pid=configure["snoop_pid"], show_all_threads=configure["show_all_threads"])
-            if configure["snoop_mem"] == "bcc":
+            if configure["snoop_mem"] == "bcc_kernel" or configure["snoop_mem"] == "bcc_user":
                 mem_record(output_fp["mem"], cur_time, bpf_obj)
                 if not configure['probes'] is None:
                     uprobe_record(output_fp["probes"], bpf_obj)
@@ -127,7 +130,14 @@ def main_loop(configure, output_fp, bpf_obj):
                 syscall_record(output_fp["syscall"], bpf_obj)
             if not configure["trace"] is None:
                 trace_record(output_fp["trace"], bpf_obj, configure)
+            # while True:
+            #     try:
+            #         (task, pid, cpu, flags, ts, msg) = b.trace_fields()
+            #     except ValueError:
+            #         break
+            #     print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
             prev_time = cur_time
+
             # 判断监控进程的状态，如果监控进程编程僵尸进程或进程已退出，则结束监控
             try:
                     status = proc.status()
@@ -173,8 +183,8 @@ def parse_args():
             help="id of the process to trace (optional)")
         parser.add_argument("-c", "--command",
             help="execute and trace the specified command (optional)")
-        parser.add_argument("-i", "--interval", type=int, default=3,
-            help="The interval of snoop (unit:s)")
+        # parser.add_argument("-i", "--interval", type=int, default=3,
+        #     help="The interval of snoop (unit:s)")
         parser.add_argument("--configure_file", help="File name of the configure.")
         args = parser.parse_args()
         if args.configure_file is not None:
@@ -186,7 +196,7 @@ def parse_args():
             print("Please specify the configure file.")
             exit()
 
-        configure['interval'] = args.interval if configure['interval'] is None else configure['interval']
+        # configure['interval'] = args.interval if configure['interval'] is None else configure['interval']
         if args.command is not None:
             print("Executing '%s' and snooping the resulting process." % args.command)
             pid = run_command_get_pid(args.command)
@@ -220,7 +230,7 @@ def check_configure(configure):
             print("ERROR: Invalid option for cpu_snoop, please check your configure file!\n")
             exit()
         
-        if configure["snoop_mem"] == "bcc":
+        if configure["snoop_mem"] == "bcc_user" or configure["snoop_mem"] == "bcc_kernel":
             if configure["mem_output_file"] is None:
                 print("ERROR: You must specific the output file for mem snoop!\n")
                 exit()
@@ -232,7 +242,7 @@ def check_configure(configure):
             exit()
 
         if not configure["probes"] is None:
-            if not configure["snoop_mem"] == "bcc":
+            if not configure["snoop_mem"] == "bcc_user" or configure["snoop_mem"] == "bcc_kernel":
                 print("ERROR: You must set mem_snoop to 'bcc' to run memleak_probes!\n")
                 exit()
             else:
@@ -289,7 +299,7 @@ def print_configure(configure):
         print("\t[%s] stat" % ("X" if configure["snoop_cpu"]=="stat" else " "))
         print("\t[%s] top" % ("X" if configure["snoop_cpu"]=="top" else " "))
         print("MEM SNOOP:")
-        print("\t[%s] BCC" % (("X" if configure["snoop_mem"]=="bcc" else " ")))
+        print("\t[%s] BCC" % (("X" if configure["snoop_mem"]=="bcc_user" or configure["snoop_mem"]=="bcc_kernel" else " ")))
         print("NETWORK SNOOP:")
         print("\t[%s] BCC" % ("X" if configure["snoop_network"]=="bcc" else " "))
         print("SYSCALL SNOOP:")
@@ -308,7 +318,7 @@ def generate_prg(configure):
     prg=header
     output_fp = {}
     if configure['snoop_cpu'] == "bcc":
-        prg += cpu_prg
+        prg = cpu_generate_prg(prg, configure)
         output_fp['cpu'] = open(configure["cpu_output_file"], "w")
         cpu_bcc_print_header(output_fp['cpu'])
     elif configure["snoop_cpu"] == "stat":
@@ -318,7 +328,7 @@ def generate_prg(configure):
         output_fp['cpu'] = open(configure["cpu_output_file"], "w")
         cpu_top_print_header(output_fp['cpu'])
     
-    if configure['snoop_mem'] == "bcc":
+    if configure['snoop_mem'] == "bcc_user" or configure['snoop_mem']=="bcc_kernel":
         prg = mem_generate_prg(prg, configure)
         output_fp['mem'] = open(configure["mem_output_file"], "w")
         mem_print_header(output_fp['mem'])
@@ -358,7 +368,7 @@ def attach_probes(configure, bpf_obj):
     """
     if configure['snoop_cpu'] == "bcc":
         cpu_attach_probe(bpf_obj)
-    if configure["snoop_mem"] == "bcc":
+    if configure["snoop_mem"] == "bcc_user" or configure["snoop_mem"] == "bcc_kernel":
         mem_attach_probe(bpf_obj)
         if not configure['probes'] is None:
             attach_uprobe(bpf_obj, configure)
@@ -376,9 +386,27 @@ def attach_probes(configure, bpf_obj):
 
 
 
-
-#if __name__=='__main__':
 def start(configure):
+    if configure['snoop_cpu'] == "bcc":
+        from cpu_snoop import cpu_generate_prg, cpu_attach_probe, cpu_record, cpu_bcc_print_header
+    elif configure["snoop_cpu"] == "stat":
+        from cpu_snoop_stat import cpu_stat_record, cpu_stat_print_header
+    elif configure["snoop_cpu"] == "top":
+        from cpu_snoop_top import cpu_top_record, cpu_top_print_header
+    if configure['snoop_mem'] == "bcc_user":
+        from mem_snoop_usr import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+        if not configure['probes'] is None:
+            from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
+    elif configure['snoop_mem'] == "bcc_kernel":
+        from mem_snoop_kernel import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+        if not configure['probes'] is None:
+            from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
+    if configure['snoop_network'] == "bcc":
+        from network_snoop import network_generate_prg, network_attach_probe, network_record, network_print_header
+    if configure["snoop_syscall"] == "bcc":
+        from syscall_snoop import syscall_generate_prg, syscall_attach_probe, syscall_record, syscall_print_header
+    if not configure["trace"] is None:
+        from tracer import tracer_generate_prg, trace_attach_probe, trace_record, trace_print_header
     global proc
     proc = psutil.Process(configure['snoop_pid'])
     prg, output_fp = generate_prg(configure)
@@ -386,3 +414,38 @@ def start(configure):
     b = BPF(text=prg)
     attach_probes(configure, b)
     main_loop(configure, output_fp, b)
+
+
+
+
+if __name__=='__main__':
+        configure = parse_args()
+        if configure['snoop_cpu'] == "bcc":
+            from cpu_snoop import cpu_generate_prg, cpu_attach_probe, cpu_record, cpu_bcc_print_header
+        elif configure["snoop_cpu"] == "stat":
+            from cpu_snoop_stat import cpu_stat_record, cpu_stat_print_header
+        elif configure["snoop_cpu"] == "top":
+            from cpu_snoop_top import cpu_top_record, cpu_top_print_header
+        if configure['snoop_mem'] == "bcc_user":
+            from mem_snoop_usr import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+            if not configure['probes'] is None:
+                from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
+        elif configure['snoop_mem'] == "bcc_kernel":
+            from mem_snoop_kernel import mem_generate_prg, mem_attach_probe, mem_record, mem_print_header
+            if not configure['probes'] is None:
+                from probe import probe_generate_prg, attach_uprobe, uprobe_record, probe_print_header
+        if configure['snoop_network'] == "bcc":
+            from network_snoop import network_generate_prg, network_attach_probe, network_record, network_print_header
+        if configure["snoop_syscall"] == "bcc":
+            from syscall_snoop import syscall_generate_prg, syscall_attach_probe, syscall_record, syscall_print_header
+        if not configure["trace"] is None:
+            from tracer import tracer_generate_prg, trace_attach_probe, trace_record, trace_print_header
+    
+        proc = psutil.Process(configure['snoop_pid'])
+        prg, output_fp = generate_prg(configure)
+        b = BPF(text=prg)
+        attach_probes(configure, b)
+        main_loop(configure, output_fp, b)
+
+
+

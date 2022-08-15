@@ -57,13 +57,24 @@ static inline void update_statistics_del(u32 tgid, u64 sz) {
 
 // 内存申请挂载函数，挂载在函数入口获得内存申请大小
 static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
-        u64 pid = bpf_get_current_pid_tgid();
+        u64 tgid_pid = bpf_get_current_pid_tgid();
+        u32 pid = tgid_pid;
+        u32 tgid = tgid_pid >> 32;
         u64 size64 = size;
-        if(lookup_tgid(pid>>32) == 0)
+        if(lookup_tgid(PID) == 0)
                 return 0;
         if(size == 0)
-                bpf_trace_printk("Warning: Try to alloc zero size block, tgid:%d, pid:%d\\n", pid>>32, pid);
-        sizes.update(&pid, &size64);
+        {
+                bpf_trace_printk("Warning: Try to alloc zero size block, tgid:%d, pid:%d\\n", pid);
+                struct combined_alloc_info_t cinfo = {
+                        .total_size = PID,
+                        .number_of_allocs = 0
+                };
+                u32 tgid = PID_MAX+2;
+                combined_allocs.update(&tgid, &cinfo);
+                return 0;
+        }
+        sizes.update(&tgid_pid, &size64);
         return 0;
 }
 // 内存申请挂载函数，挂载在函数返回处更新内存信息
@@ -187,7 +198,7 @@ TRACEPOINT_PROBE(kmem, mm_page_free) {
 
 
 def mem_print_header(output_file):
-        output_file.write("%s,%s,%s\n" %("TIME", "SIZE(B)", "NUM"))
+        output_file.write("%s,%s,%s,%s\n" %("TIME", "PID", "SIZE(B)", "NUM"))
 
 def mem_attach_probe(bpf_obj):
         return
@@ -209,6 +220,8 @@ def mem_record(output_file, cur_time, bpf_obj):
                 # BCC使用items()获取表中内容返回的k为c_uint8对象，需要使用value获取值
                 if key.value == pid_max+1:
                         print("[%.2f]Warning: Detect operation trying to free unknown memory, pid:%d, address:%x\n" % (cur_time, info.total_size, info.number_of_allocs))
+                elif key.value == pid_max+2:
+                        print("[%.2f]Warning: Detect operation trying to alloc zero size block, pid:%d" % (cur_time, info.total_size))
                 else:
                         output_file.write("%.2f,%12d,%d,%d\n" % (cur_time, key.value, info.total_size, info.number_of_allocs))
                         valid = 1    
